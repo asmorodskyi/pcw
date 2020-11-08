@@ -1,3 +1,4 @@
+from ocw.lib import emailnotify
 from ocw.lib.EC2 import EC2
 from webui.settings import PCWConfig
 from tests.generators import mock_get_feature_property
@@ -122,7 +123,7 @@ def test_cleanup_snapshots(monkeypatch):
     response = {
         'Snapshots': [{'SnapshotId': snapshotid_to_delete,'StartTime': datetime.now()}]
         }
-    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda self, section, field: -1)
+    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda *args, **kwargs: -1)
     monkeypatch.setattr(EC2, 'check_credentials', lambda *args, **kwargs: True)
     monkeypatch.setattr(EC2, 'needs_to_delete_snapshot', lambda *args, **kwargs: True)
     monkeypatch.setattr(EC2, 'ec2_client', lambda self, region: mocked_ec2_client)
@@ -164,7 +165,7 @@ def test_cleanup_volumes(monkeypatch):
     monkeypatch.setattr(EC2, 'check_credentials', lambda *args, **kwargs: True)
     monkeypatch.setattr(EC2, 'ec2_client', lambda self, region: mocked_ec2_client)
     monkeypatch.setattr(EC2, 'get_all_regions', lambda self: ['eu-central'])
-    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda self, section, field: -1)
+    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda *args, **kwargs: -1)
     volumeid_to_delete = 'delete_me'
 
     deleted_volumes = []
@@ -185,9 +186,45 @@ def test_cleanup_volumes(monkeypatch):
 
     assert len(deleted_volumes) == 0
 
-    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda self, section, field: 5)
+    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda *args, **kwargs: 5)
 
     ec2.cleanup_volumes()
 
     assert len(deleted_volumes) == 1
     assert deleted_volumes[0] == volumeid_to_delete
+
+def test_cleanup_uploader_vpc(monkeypatch):
+    def mocked_ec2_client():
+        pass
+
+    def mocked_get_boolean(config_path, field=None):
+        if config_path == 'default/dry_run':
+            return False
+        else:
+            return True
+
+    cnt = 0
+
+    def mocked_send_email(subject, body):
+        global cnt
+        cnt += 1
+
+    response = {
+        'Vpcs': [
+            {'VpcId': 'someId', 'OwnerId': 'someId'}
+        ]
+    }
+    monkeypatch.setattr(EC2, 'check_credentials', lambda *args, **kwargs: True)
+    monkeypatch.setattr(EC2, 'ec2_client', lambda self, region: mocked_ec2_client)
+    monkeypatch.setattr(EC2, 'get_all_regions', lambda self: ['eu-central'])
+    monkeypatch.setattr(EC2, 'delete_vpc', lambda self, region, vpcId: False)
+    monkeypatch.setattr(PCWConfig, 'getBoolean', mocked_get_boolean)
+    monkeypatch.setattr(PCWConfig, 'get_feature_property', lambda *args, **kwargs: -1)
+    monkeypatch.setattr(emailnotify, 'send_mail', mocked_send_email)
+
+    mocked_ec2_client.describe_vpcs = lambda Filters: response
+
+    ec2 = EC2('fake')
+    ec2.cleanup_uploader_vpcs()
+
+    assert cnt == 1

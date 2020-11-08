@@ -15,7 +15,7 @@ class MockImage:
         self.last_modified = last_modified
 
 
-def mock_get_feature_property(feature: str, property: str, namespace: str):
+def mock_get_feature_property(feature: str, property: str, namespace: str = None):
     if property == 'min-image-age-hours':
         return min_image_age_hours
     elif property == 'max-images-per-flavor':
