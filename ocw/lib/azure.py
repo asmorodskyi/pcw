@@ -209,8 +209,9 @@ class Azure(Provider):
                 if version.tags is not None and Instance.TAG_IGNORE in version.tags:
                     self.log_info(f"Image version {version} for image {image} in gallery {self.__gallery} has {Instance.TAG_IGNORE} tag")
                     continue
+                version_date = parse(self.get_resource_properties(version.id)['publishingProfile']['publishedDate'])
                 if version.provisioning_state == "Failed" or \
-                        self.is_outdated(parse(self.get_resource_properties(version.id)['publishingProfile']['publishedDate'])):
+                        self.is_outdated(version_date):
                     if self.dry_run:
                         self.log_info(f"Deletion of version {gallery.name}/{image.name}/{version.name} skipped due to dry run mode")
                     else:
@@ -218,6 +219,8 @@ class Azure(Provider):
                         self.compute_mgmt_client().gallery_image_versions.begin_delete(
                                 self.__resource_group, gallery.name, image.name, version.name
                         )
+                else:
+                    self.log_dbg(f"{version.name}: {version_date}")
             # Delete image definition if all image versions were deleted
             if not versions:
                 if self.dry_run:

@@ -45,6 +45,7 @@ class Provider:
         """
         delta_in_hours = PCWConfig.get_feature_property('cleanup', 'max-age-hours', self._namespace)
         max_allowed_age = datetime.now(timezone.utc) - timedelta(hours=delta_in_hours)
+        self.log_dbg(f"is_outdated: {max_allowed_age} > {timestamp}")
         return max_allowed_age > timestamp
 
     def log_info(self,  message: str, *args: object):
